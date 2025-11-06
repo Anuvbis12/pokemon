@@ -33,4 +33,12 @@ class Pokemon {
       url: json['url'],
     );
   }
+
+  factory Pokemon.fromDetailJson(Map<String, dynamic> json) {
+    return Pokemon(
+      id: json['id'],
+      name: json['name'],
+      url: 'https://pokeapi.co/api/v2/pokemon/${json['id']}/',
+    );
+  }
 }

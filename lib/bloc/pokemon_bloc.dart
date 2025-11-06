@@ -14,8 +14,14 @@ class PokemonBloc extends Bloc<PokemonEvent, PokemonState> {
     on<FetchPokemons>((event, emit) async {
       emit(PokemonLoading());
       try {
-        final pokemonList = await _pokemonService.fetchPokemonList();
-        emit(PokemonLoaded(pokemonList));
+        // Phase 1: Fetch and emit the basic list for a fast initial load.
+        final basicPokemonList = await _pokemonService.fetchPokemonList();
+        emit(PokemonLoaded(basicPokemonList));
+
+        // Phase 2: Fetch details in the background and emit the updated list.
+        final detailedPokemonList = await _pokemonService.fetchDetailsForList(basicPokemonList);
+        emit(PokemonLoaded(detailedPokemonList));
+
       } catch (e) {
         emit(PokemonError(e.toString()));
       }
@@ -28,7 +34,9 @@ class PokemonBloc extends Bloc<PokemonEvent, PokemonState> {
         final pokemonList = (response.data['pokemon'] as List)
             .map((p) => Pokemon.fromJson(p['pokemon']))
             .toList();
-        emit(PokemonLoaded(pokemonList));
+        // We need to fetch details for this list as well to get colors
+        final detailedPokemonList = await _pokemonService.fetchDetailsForList(pokemonList);
+        emit(PokemonLoaded(detailedPokemonList));
       } catch (e) {
         emit(PokemonError('Failed to load Pokémon by type: ${e.toString()}'));
       }

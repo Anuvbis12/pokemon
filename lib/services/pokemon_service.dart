@@ -4,12 +4,10 @@ import 'package:pokemon/models/pokemon.dart';
 class PokemonService {
   final Dio _dio = Dio();
 
-  // Optimized to fetch only the list, not all details.
   Future<List<Pokemon>> fetchPokemonList() async {
     try {
       final response = await _dio.get('https://pokeapi.co/api/v2/pokemon?limit=350');
       final List<dynamic> results = response.data['results'];
-      // Just convert the list to Pokemon objects, don't fetch details here.
       final pokemonList = results.map((json) => Pokemon.fromJson(json)).toList();
       return pokemonList;
     } catch (e) {
@@ -17,9 +15,38 @@ class PokemonService {
     }
   }
 
+  Future<List<Pokemon>> fetchDetailsForList(List<Pokemon> pokemons) async {
+    try {
+      final pokemonFutures = pokemons.map((pokemon) async {
+        if (pokemon.types == null) {
+          final detailResponse = await _dio.get(pokemon.url);
+          final data = detailResponse.data;
+          pokemon.types = (data['types'] as List<dynamic>)
+              .map((typeInfo) => typeInfo['type']['name'] as String)
+              .toList();
+        }
+        return pokemon;
+      }).toList();
+
+      return await Future.wait(pokemonFutures);
+    } catch (e) {
+      print('Failed to fetch some details: $e');
+      return pokemons;
+    }
+  }
+
+  Future<Pokemon> fetchPokemonByName(String name) async {
+    try {
+      final response = await _dio.get('https://pokeapi.co/api/v2/pokemon/$name');
+      final pokemon = Pokemon.fromDetailJson(response.data);
+      return fetchPokemonDetails(pokemon); // Reuse existing detail fetching logic
+    } catch (e) {
+      throw Exception('Failed to load Pokémon by name');
+    }
+  }
+
   Future<Pokemon> fetchPokemonDetails(Pokemon pokemon) async {
     try {
-      // Fetch basic details
       final response = await _dio.get(pokemon.url);
       final data = response.data;
       pokemon.types = (data['types'] as List<dynamic>)
@@ -37,7 +64,6 @@ class PokemonService {
       pokemon.height = data['height'];
       pokemon.weight = data['weight'];
 
-      // Fetch species data to get evolution chain URL
       final speciesResponse = await _dio.get('https://pokeapi.co/api/v2/pokemon-species/${pokemon.id}');
       if (speciesResponse.data['evolution_chain'] != null) {
         final evolutionChainUrl = speciesResponse.data['evolution_chain']['url'];
